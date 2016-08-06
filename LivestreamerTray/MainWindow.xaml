@@ -1,0 +1,50 @@
+﻿<Window x:Class="LivestreamerTray.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="LivestreamerTray" Closing="HandleClosing" 
+        Height="175" Width="525" AllowDrop="True"
+        MinHeight="175" MinWidth="450"
+        DragOver="HandleDragOver" Drop="HandleDrop">
+    
+    <Grid x:Name="MainGrid"    >
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"></ColumnDefinition>
+            <ColumnDefinition Width="130"></ColumnDefinition>
+        </Grid.ColumnDefinitions>
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="auto"></RowDefinition>
+                <RowDefinition Height="*"></RowDefinition>
+            </Grid.RowDefinitions>
+            <Grid Margin="4" >
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"></ColumnDefinition>
+                    <ColumnDefinition Width="auto"></ColumnDefinition>
+                </Grid.ColumnDefinitions>
+                <TextBox Grid.Column="0" Margin="4" x:Name="UrlBox" VerticalContentAlignment="Center"></TextBox>
+                <Button Grid.Column="1" Width="50" Margin="4" Click="HandleClick">OK</Button>
+            </Grid>
+             
+            <!--<Grid Margin="30" AllowDrop="True" Drop="HandleDrop" Grid.Row="1">
+                <Rectangle Stroke="#FF000000" Height="200" StrokeThickness="1" StrokeDashArray="4 4"
+                                                       SnapsToDevicePixels="True"/>
+                <TextBlock HorizontalAlignment="Center"
+                           VerticalAlignment="Center">Drop stream url here</TextBlock>
+            </Grid>-->
+        </Grid>
+        
+        <Grid Grid.Column="1">
+            <GroupBox Header="Quality" Margin="4">
+                <StackPanel Margin="4">
+                    <RadioButton Margin="2" GroupName="Quality" IsChecked="{Binding SourceQuality, Mode=TwoWay}" Content="Source"></RadioButton>
+                    <RadioButton Margin="2" GroupName="Quality" IsChecked="{Binding HighQuality, Mode=TwoWay}" Content="High"></RadioButton>
+                    <RadioButton Margin="2" GroupName="Quality" IsChecked="{Binding MediumQuality, Mode=TwoWay}" Content="Medium"></RadioButton>
+                    <RadioButton Margin="2" GroupName="Quality" IsChecked="{Binding LowQuality, Mode=TwoWay}" Content="Low"></RadioButton>
+                    <RadioButton Margin="2" GroupName="Quality" IsChecked="{Binding AudioQuality, Mode=TwoWay}" Content="Audio"></RadioButton>
+                </StackPanel>
+            </GroupBox>
+            
+        </Grid>
+        
+    </Grid>
+</Window>
