@@ -2,11 +2,15 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Timers;
 using System.Windows;
 using System.Windows.Forms;
+using System.Windows.Media.Imaging;
 using LivestreamerTray.Properties;
+using MahApps.Metro.Controls;
 using DragDropEffects = System.Windows.DragDropEffects;
 using DragEventArgs = System.Windows.DragEventArgs;
+using Timer = System.Timers.Timer;
 
 namespace LivestreamerTray
 {
@@ -23,12 +27,14 @@ namespace LivestreamerTray
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class MainWindow : MetroWindow
     {
         private NotifyIcon _notifyIcon;
         private bool _close4Real;
-        private static Process _livestreamerProcess;
+        private Process _livestreamerProcess;
         public static string LivestreamerExe = "livestreamer.exe";
+
+        public Timer t = new Timer(2000);
 
         public MainWindow()
         {
@@ -42,6 +48,9 @@ namespace LivestreamerTray
             MenuItem itemExit = new MenuItem("Exit", HandleExitTray);
             itemExit.Text = "Exit";
 
+            Uri iconUri = new Uri("pack://application:,,,/Icon.ico", UriKind.RelativeOrAbsolute);
+            this.Icon = BitmapFrame.Create(iconUri);
+
             SetSelectedQuality(SelectedQuality);
 
             _notifyIcon.ContextMenu.MenuItems.Add(itemExit);
@@ -52,7 +61,21 @@ namespace LivestreamerTray
                     WindowState = WindowState.Normal;
                 };
 
+            t.AutoReset = true;
+            t.Elapsed += HandleElapsed;
             MainGrid.DataContext = this;
+        }
+
+        private void HandleElapsed(object sender, ElapsedEventArgs e)
+        {
+            if (_livestreamerProcess != null && !_livestreamerProcess.HasExited)
+            {
+                string output = _livestreamerProcess.StandardOutput.ReadLine();
+                Dispatcher.Invoke(() =>
+                {
+                    OutputTextBlock.Text = OutputTextBlock.Text + output + Environment.NewLine;
+                });
+            }
         }
 
         private void HandleExitTray(object sender, EventArgs e)
@@ -81,7 +104,7 @@ namespace LivestreamerTray
             }
         }
 
-        internal static bool LaunchLivestreamer(string url, string quality)
+        internal bool LaunchLivestreamer(string url, string quality)
         {
             bool res = true;
 
@@ -96,14 +119,21 @@ namespace LivestreamerTray
             string args = string.Join(" ", "/c", path, url, quality);
 
             Console.WriteLine("Launching Livestreamer with command: cmd.exe" + " " + args);
+            OutputTextBlock.Text = string.Empty;
 
             ProcessStartInfo startInfo = new ProcessStartInfo("cmd.exe");
             startInfo.Arguments = args;
             startInfo.UseShellExecute = false;
+            startInfo.RedirectStandardOutput = true;
+            startInfo.CreateNoWindow = true;
 
             _livestreamerProcess = new Process();
+            _livestreamerProcess.OutputDataReceived += HandleOutput;
             _livestreamerProcess.StartInfo = startInfo;
             _livestreamerProcess.EnableRaisingEvents = true;
+            _livestreamerProcess.Exited += HandleLivestreamerExited;
+
+            t.Start();
 
             try
             {
@@ -114,7 +144,7 @@ namespace LivestreamerTray
                 Console.WriteLine("Cannot start Livestreamer:" + e.Message);
                 try
                 {
-                    _livestreamerProcess.Dispose();
+                    DisposeLivestreamerProcess();
                 }
                 catch (Exception ex)
                 {
@@ -123,10 +153,35 @@ namespace LivestreamerTray
 
                 res = false;
             }
+
+            t.Start();
             return res;
         }
 
-        
+        private void DisposeLivestreamerProcess()
+        {
+            if (_livestreamerProcess != null)
+            {
+                _livestreamerProcess.Exited -= HandleLivestreamerExited;
+                _livestreamerProcess.OutputDataReceived -= HandleOutput;
+                _livestreamerProcess.Dispose();
+            }
+            t.Stop();            
+        }
+
+        private void HandleLivestreamerExited(object sender, EventArgs e)
+        {
+            DisposeLivestreamerProcess();
+        }
+
+        private void HandleOutput(object sender, DataReceivedEventArgs e)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                OutputTextBlock.Text = OutputTextBlock.Text + e.Data;
+            });
+        }
+
 
         public static string DefaultQuality 
         {
