@@ -31,10 +31,10 @@ namespace LivestreamerTray
     {
         private NotifyIcon _notifyIcon;
         private bool _close4Real;
-        private Process _livestreamerProcess;
+        private static Process _livestreamerProcess;
         public static string LivestreamerExe = "livestreamer.exe";
 
-        public Timer t = new Timer(2000);
+        public static readonly Timer t = new Timer(1000);
 
         public MainWindow()
         {
@@ -68,13 +68,25 @@ namespace LivestreamerTray
 
         private void HandleElapsed(object sender, ElapsedEventArgs e)
         {
-            if (_livestreamerProcess != null && !_livestreamerProcess.HasExited)
+            try
             {
-                string output = _livestreamerProcess.StandardOutput.ReadLine();
-                Dispatcher.Invoke(() =>
+                lock (launchLock)
                 {
-                    OutputTextBlock.Text = OutputTextBlock.Text + output + Environment.NewLine;
-                });
+                    if (_livestreamerProcess != null &&
+                        !_livestreamerProcess.HasExited &&
+                        !_livestreamerProcess.StandardOutput.EndOfStream)
+                    {
+                        string output = _livestreamerProcess.StandardOutput.ReadLine();
+                        Dispatcher.Invoke(() =>
+                        {
+                            OutputTextBlock.Text = OutputTextBlock.Text + output + Environment.NewLine;
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
             }
         }
 
@@ -100,73 +112,127 @@ namespace LivestreamerTray
                 Settings.Default.Quality = SelectedQuality;
                 Settings.Default.Save();
 
-                //DisposeResources();
+                DisposeResources();
             }
         }
+
+        private void DisposeResources()
+        {
+            DisposeLivestreamerProcess();
+
+            _notifyIcon.Dispose();
+        }
+
+        private object launchLock = new object();
 
         internal bool LaunchLivestreamer(string url, string quality)
         {
             bool res = true;
 
-            //stream quality
-            quality = string.IsNullOrEmpty(quality)
-                            ? DefaultQuality
-                            : quality.ToLower();
-
-            //stream path
-            string path = Path.Combine("", LivestreamerExe);
-            path = "\"" + path + "\"";
-            string args = string.Join(" ", "/c", path, url, quality);
-
-            Console.WriteLine("Launching Livestreamer with command: cmd.exe" + " " + args);
-            OutputTextBlock.Text = string.Empty;
-
-            ProcessStartInfo startInfo = new ProcessStartInfo("cmd.exe");
-            startInfo.Arguments = args;
-            startInfo.UseShellExecute = false;
-            startInfo.RedirectStandardOutput = true;
-            startInfo.CreateNoWindow = true;
-
-            _livestreamerProcess = new Process();
-            _livestreamerProcess.OutputDataReceived += HandleOutput;
-            _livestreamerProcess.StartInfo = startInfo;
-            _livestreamerProcess.EnableRaisingEvents = true;
-            _livestreamerProcess.Exited += HandleLivestreamerExited;
-
-            t.Start();
-
-            try
+            lock (launchLock)
             {
-                _livestreamerProcess.Start();
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine("Cannot start Livestreamer:" + e.Message);
                 try
+                {
+                    if (_livestreamerProcess != null && !_livestreamerProcess.HasExited)
+                        DisposeLivestreamerProcess();
+                }
+                catch (Exception) //process not started
                 {
                     DisposeLivestreamerProcess();
                 }
-                catch (Exception ex)
+
+                //stream quality
+                quality = string.IsNullOrEmpty(quality)
+                    ? DefaultQuality
+                    : quality.ToLower();
+
+                //stream path
+
+                string path = Path.Combine(
+                    Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly().Location),
+                    "livestreamer",
+                    LivestreamerExe);
+
+                if (!File.Exists(path))
                 {
-                    Console.WriteLine("Cannot dispose Livestreamer process:" + ex.Message);
+                    path = LivestreamerExe;
                 }
 
-                res = false;
-            }
 
-            t.Start();
+                path = "\"" + path + "\"";
+                string args = string.Join(" ", "/c", path, url, quality);
+
+                
+                Console.WriteLine("Launching Livestreamer: cmd.exe" + " " + args);
+
+                OutputTextBlock.Text = string.Empty;
+                OutputTextBlock.Text = "Launching Livestreamer: cmd.exe" + " " + args;
+
+                ProcessStartInfo startInfo = new ProcessStartInfo("cmd.exe");
+                startInfo.Arguments = args;
+                startInfo.UseShellExecute = false;
+                startInfo.RedirectStandardOutput = true;
+                startInfo.CreateNoWindow = true;
+
+                _livestreamerProcess = new Process();
+                _livestreamerProcess.OutputDataReceived += HandleOutput;
+                _livestreamerProcess.StartInfo = startInfo;
+                _livestreamerProcess.EnableRaisingEvents = true;
+                _livestreamerProcess.Exited += HandleLivestreamerExited;
+
+                t.Start();
+
+                try
+                {
+                    _livestreamerProcess.Start();
+
+                    ProcessRunningText.Text = "Livestreamer running";
+
+                    //ProcessRunning = true;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine("Cannot start Livestreamer:" + e.Message);
+                    try
+                    {
+                        DisposeLivestreamerProcess();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Cannot dispose Livestreamer process:" + ex.Message);
+                    }
+
+                    res = false;
+                }
+            }
             return res;
+
         }
 
         private void DisposeLivestreamerProcess()
         {
-            if (_livestreamerProcess != null)
+            lock (launchLock)
             {
-                _livestreamerProcess.Exited -= HandleLivestreamerExited;
-                _livestreamerProcess.OutputDataReceived -= HandleOutput;
-                _livestreamerProcess.Dispose();
+                try
+                {
+                    if (_livestreamerProcess != null)
+                    {
+                        _livestreamerProcess.Exited -= HandleLivestreamerExited;
+                        _livestreamerProcess.OutputDataReceived -= HandleOutput;
+                        _livestreamerProcess.Close();
+                        _livestreamerProcess = null;
+
+                        Dispatcher.Invoke(() => { ProcessRunningText.Text = "Livestreamer off"; });
+
+                        //not used anymore. Process can be re-started with a new url 
+                        //Dispatcher.Invoke(() => { ProcessRunning = false; });
+                    }
+                }
+                finally
+                {
+                    t.Stop();
+                }
             }
-            t.Stop();            
         }
 
         private void HandleLivestreamerExited(object sender, EventArgs e)
@@ -237,6 +303,15 @@ namespace LivestreamerTray
                 default:
                     throw new ArgumentOutOfRangeException("quality");
             }
+        }
+
+        public static readonly DependencyProperty ProcessRunningProperty = DependencyProperty.Register(
+            "ProcessRunning", typeof (bool), typeof (MainWindow), new PropertyMetadata(default(bool)));
+
+        public bool ProcessRunning
+        {
+            get { return (bool) GetValue(ProcessRunningProperty); }
+            set { SetValue(ProcessRunningProperty, value); }
         }
 
         public static readonly DependencyProperty QualityProperty = DependencyProperty.Register(
