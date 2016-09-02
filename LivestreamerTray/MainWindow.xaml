@@ -4,7 +4,7 @@
         xmlns:controls="http://metro.mahapps.com/winfx/xaml/controls"
         xmlns:livestreamerTray="clr-namespace:LivestreamerTray"
         Title="Livestreamer Tray" Closing="HandleClosing" 
-        Height="236" Width="670" AllowDrop="True"
+        Height="280" Width="670" AllowDrop="True"
         IsMaxRestoreButtonEnabled="False"
         ResizeMode="CanMinimize"
         BorderThickness="1" BorderBrush="LightGray"
@@ -62,11 +62,13 @@
         <Grid Grid.Column="1" Grid.Row="0">
             <GroupBox Header="Quality" Margin="4">
                 <StackPanel Margin="4">
+                    <RadioButton Margin="2" GroupName="Quality" IsChecked="{Binding BestQuality, Mode=TwoWay}" Content="Best"></RadioButton>
                     <RadioButton Margin="2" GroupName="Quality" IsChecked="{Binding SourceQuality, Mode=TwoWay}" Content="Source"></RadioButton>
                     <RadioButton Margin="2" GroupName="Quality" IsChecked="{Binding HighQuality, Mode=TwoWay}" Content="High"></RadioButton>
                     <RadioButton Margin="2" GroupName="Quality" IsChecked="{Binding MediumQuality, Mode=TwoWay}" Content="Medium"></RadioButton>
                     <RadioButton Margin="2" GroupName="Quality" IsChecked="{Binding LowQuality, Mode=TwoWay}" Content="Low"></RadioButton>
                     <RadioButton Margin="2" GroupName="Quality" IsChecked="{Binding AudioQuality, Mode=TwoWay}" Content="Audio"></RadioButton>
+                    <RadioButton Margin="2" GroupName="Quality" IsChecked="{Binding WorstQuality, Mode=TwoWay}" Content="Worst"></RadioButton>
                 </StackPanel>
             </GroupBox>
 
