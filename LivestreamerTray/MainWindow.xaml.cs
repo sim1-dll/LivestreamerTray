@@ -73,7 +73,7 @@ namespace LivestreamerTray
         private void HandleElapsed(object sender, ElapsedEventArgs e)
         {
             t.Enabled = false;
-
+            Console.WriteLine("Checking output...");
             try
             {
                 lock (launchLock)
@@ -105,6 +105,7 @@ namespace LivestreamerTray
             {
                 t.Enabled = true;
             }
+            Console.WriteLine("Checking output end");
         }
 
         private void HandleExitTray(object sender, EventArgs e)
@@ -361,6 +362,19 @@ namespace LivestreamerTray
             await LaunchLivestreamer(UrlBox.Text, SelectedQuality.ToString());
         }
 
+        private void HandleChat(object sender, RoutedEventArgs e)
+        {
+            if (!string.IsNullOrEmpty(UrlBox.Text))
+            {
+                if (UrlBox.Text.StartsWith("http://www.twitch.tv") ||
+                    UrlBox.Text.StartsWith("https://www.twitch.tv") ||
+                    UrlBox.Text.StartsWith("www.twitch.tv") )
+                {
+                    Process.Start(UrlBox.Text + @"/chat?popout=");        
+                }
+            }
+        }
+
         public void SetSelectedQuality(StreamQuality quality)
         {
             switch (quality)
@@ -486,8 +500,6 @@ namespace LivestreamerTray
             get { return (bool)GetValue(AudioQualityProperty); }
             set { SetValue(AudioQualityProperty, value); }
         }
-
-
-
+        
     }
 }
