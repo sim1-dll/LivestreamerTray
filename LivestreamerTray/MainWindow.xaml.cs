@@ -55,7 +55,7 @@ namespace LivestreamerTray
             Uri iconUri = new Uri("pack://application:,,,/Icon.ico", UriKind.RelativeOrAbsolute);
             this.Icon = BitmapFrame.Create(iconUri);
 
-            SetSelectedQuality(SelectedQuality);
+            SetSelectedQuality(Settings.Default.Quality);
 
             _notifyIcon.ContextMenu.MenuItems.Add(itemExit);
             _notifyIcon.Click +=
@@ -286,30 +286,43 @@ namespace LivestreamerTray
 
         private void DisposeLivestreamerProcess(Process p)
         {
+            if (p == null) 
+                return;
+
             lock (launchLock)
             {
                 try
                 {
-                    if (p != null)
+                    p.Exited -= HandleLivestreamerExited;
+                    p.OutputDataReceived -= HandleOutput;
+
+                    //finish reading output before closing the process
+                    Task<string> output = p.StandardOutput.ReadLineAsync();
+                    if (output.Wait(2000))
                     {
-                        p.Exited -= HandleLivestreamerExited;
-                        p.OutputDataReceived -= HandleOutput;
-
-                        if (!p.HasExited) //avoid confusion between "close process method / process exited event"
+                        if (!string.IsNullOrEmpty(output.Result))
                         {
-                            KillAllProcessesSpawnedBy((uint)p.Id);
-
-                            p.CloseMainWindow();
-                            p.Kill();
-                            p.Close();
-                            p.Dispose();
+                            Dispatcher.Invoke(() =>
+                            {
+                                OutputTextBlock.Text = OutputTextBlock.Text + output.Result + Environment.NewLine;
+                            });
                         }
-
-                        Dispatcher.Invoke(() => { ProcessRunningText.Text = "Livestreamer off"; });
-
-                        //not used anymore. Process can be re-started with a new url 
-                        //Dispatcher.Invoke(() => { ProcessRunning = false; });
                     }
+
+                    if (!p.HasExited) //avoid confusion between "close process method / process exited event"
+                    {
+                        KillAllProcessesSpawnedBy((uint)p.Id);
+
+                        p.CloseMainWindow();
+                        p.Kill();
+                        p.Close();
+                        p.Dispose();
+                    }
+
+                    Dispatcher.Invoke(() => { ProcessRunningText.Text = "Livestreamer off"; });
+
+                    //not used anymore. Process can be re-started with a new url 
+                    //Dispatcher.Invoke(() => { ProcessRunning = false; });
                 }
                 finally
                 {
